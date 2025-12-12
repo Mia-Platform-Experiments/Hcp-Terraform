@@ -1,0 +1,68 @@
+name: Deploy Workflow
+on: deployment
+jobs:
+  deploy-ENVIRONMENT_NAME:
+    name: Deploy to ENVIRONMENT_NAME environment
+    if: ${{ github.event.deployment.environment }} == ENVIRONMENT_NAME
+    concurrency: ENVIRONMENT_NAME
+    permissions:
+      deployments: write
+      contents: read
+    runs-on: ubuntu-latest
+    container: miaplatform/mlp:2.1.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update deployment status (pending)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          state: 'pending'
+          deployment-id: ${{ github.event.deployment.id }}
+      - name: Deploy my app
+        env:
+          GIT_DEPTH: 1
+          ENVIRONMENT_VARIABLES_PREFIX: MIA_
+          BASE_PATH: ${{ github.workspace }}/configuration
+          OVERLAY_PATH: "${{ github.workspace }}/overlays/${{ github.event.deployment.environment }}"
+          DESTINATION_PATH: "${{ github.workspace }}/interpolated-files"
+          GENERATE_FILE: "${{ github.workspace }}/mlp.yaml"
+          VARIABLES_FILE: "${{ github.workspace }}/overlays/${{ github.event.deployment.environment }}/variables.env"
+          ENVIRONMENT_TO_DEPLOY: ${{ github.event.deployment.environment }}
+          ENVIRONMENT_PREFIX: ${{ github.event.deployment.environment }}_
+          DEPLOY_TYPE: ${{ github.event.deployment.payload.variables.DEPLOY_TYPE }}
+          FORCE_DEPLOY_WHEN_NO_SEMVER: ${{ github.event.deployment.payload.variables.FORCE_DEPLOY_WHEN_NO_SEMVER }}
+          KUBE_NAMESPACE: ${{ github.event.deployment.payload.variables.KUBE_NAMESPACE }}
+          KUBE_URL: ${{ secrets.KUBE_URL }}
+          KUBE_CA_PEM: ${{ secrets.KUBE_CA_PEM }}
+          KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_TOKEN: ${{ secrets.NEXUS_TOKEN }}
+          NEXUS_URL: ${{ secrets.NEXUS_URL }}
+        run: |
+          export RELEASE_DATE="$(date -I'seconds' -u)"
+          tee /tmp/ca.pem > /dev/null << EOF
+          ${KUBE_CA_PEM}
+          EOF
+          mkdir ${DESTINATION_PATH}
+          test -f "${VARIABLES_FILE}" && set -a && source "${VARIABLES_FILE}"
+          test -f "${GENERATE_FILE}" && mlp generate -c "${GENERATE_FILE}" -e "${ENVIRONMENT_PREFIX}" -e "${ENVIRONMENT_VARIABLES_PREFIX}" -o "${OVERLAY_PATH}"
+          mlp hydrate "${BASE_PATH}" "${OVERLAY_PATH}"
+          mlp interpolate -e "${ENVIRONMENT_PREFIX}" -e "${ENVIRONMENT_VARIABLES_PREFIX}" -f "${BASE_PATH}" -o "${BASE_PATH}"
+          mlp interpolate -e "${ENVIRONMENT_PREFIX}" -e "${ENVIRONMENT_VARIABLES_PREFIX}" -f "${OVERLAY_PATH}" -o "${OVERLAY_PATH}"
+          mlp kustomize "${OVERLAY_PATH}" -o "${DESTINATION_PATH}/kustomize-output.yaml"
+          mlp deploy --ensure-namespace=false --server "${KUBE_URL}" --certificate-authority "/tmp/ca.pem" --token "${KUBE_TOKEN}" --deploy-type "${DEPLOY_TYPE}" --force-deploy-when-no-semver="${FORCE_DEPLOY_WHEN_NO_SEMVER}" -f "${DESTINATION_PATH}/kustomize-output.yaml" -n "${KUBE_NAMESPACE}"
+      - name: Update deployment status (success)
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          state: 'success'
+          deployment-id: ${{ github.event.deployment.id }}
+      - name: Update deployment status (failure)
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          state: 'failure'
+          deployment-id: ${{ github.event.deployment.id }}
