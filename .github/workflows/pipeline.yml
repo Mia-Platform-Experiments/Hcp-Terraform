@@ -40,6 +40,18 @@ jobs:
           rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
           terraform version
           
+          echo "==> Configuring Terraform Cloud credentials"
+          mkdir -p ~/.terraform.d
+          cat > ~/.terraform.d/credentials.tfrc.json << EOF
+          {
+            "credentials": {
+              "app.terraform.io": {
+                "token": "${TF_API_TOKEN}"
+              }
+            }
+          }
+          EOF
+          
           echo "==> Creating working directory: ${TERRAFORM_WORK_DIR}"
           mkdir -p ${TERRAFORM_WORK_DIR}
           cd ${TERRAFORM_WORK_DIR}
