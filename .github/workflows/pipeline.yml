@@ -20,17 +20,24 @@ jobs:
           state: 'pending'
           deployment-id: ${{ github.event.deployment.id }}
       - name: Provision infrastructure with Terraform
-        uses: docker://hashicorp/terraform:1.6
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
+          TERRAFORM_VERSION: 1.6.6
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
           VARIABLES_FILE_PATH: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service/my-azure-app-service.variables.tf
         run: |
-          # Create working directory
+          echo "==> Installing Terraform CLI ${TERRAFORM_VERSION}"
+          wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+          unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+          mv terraform /usr/local/bin/
+          rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+          terraform version
+          
+          echo "==> Creating working directory: ${TERRAFORM_WORK_DIR}"
           mkdir -p ${TERRAFORM_WORK_DIR}
           cd ${TERRAFORM_WORK_DIR}
           
-          # Generate main.tf with HCP Terraform configuration
+          echo "==> Generating main.tf with HCP Terraform configuration"
           cat > main.tf << 'EOF'
           terraform {
             cloud {
@@ -52,16 +59,20 @@ jobs:
           }
           EOF
           
-          # Copy variables file to working directory
-          cp ${VARIABLES_FILE_PATH} ${TERRAFORM_WORK_DIR}/
+          echo "==> Generated main.tf content:"
+          cat main.tf
           
-          # Initialize Terraform with HCP Terraform backend
+          echo "==> Copying variables file from: ${VARIABLES_FILE_PATH}"
+          cp ${VARIABLES_FILE_PATH} ${TERRAFORM_WORK_DIR}/
+          ls -la ${TERRAFORM_WORK_DIR}
+          
+          echo "==> Initializing Terraform with HCP Terraform backend"
           terraform init
           
-          # Plan infrastructure changes
+          echo "==> Planning infrastructure changes"
           terraform plan
           
-          # Apply infrastructure changes
+          echo "==> Applying infrastructure changes"
           terraform apply -auto-approve
       - name: Deploy my app
         env:
