@@ -152,21 +152,34 @@ jobs:
           
           echo ""
           echo "==> Committing generated Terraform configuration"
-          COMMIT_DIR="${{ github.workspace }}/environments/${{ github.event.deployment.environment }}/terraform/app-service"
+          echo "  Current directory: $(pwd)"
+          echo "  Changing to workspace: ${{ github.workspace }}"
+          cd ${{ github.workspace }}
+          echo "  New directory: $(pwd)"
+          echo "  Checking git status:"
+          git status || echo "  Git repository check failed"
+          ls -la .git || echo "  No .git directory found"
+          
+          COMMIT_DIR="environments/${{ github.event.deployment.environment }}/terraform/app-service"
+          echo "  Target commit directory: ${COMMIT_DIR}"
           mkdir -p "${COMMIT_DIR}"
           
           echo "  Copying main.tf to ${COMMIT_DIR}"
           cp ${TERRAFORM_WORK_DIR}/main.tf "${COMMIT_DIR}/main.tf"
+          ls -la "${COMMIT_DIR}/main.tf"
           
           echo "  Copying transformed variables files to ${COMMIT_DIR}"
           cp ${TERRAFORM_WORK_DIR}/*.variables.tf "${COMMIT_DIR}/"
+          ls -la "${COMMIT_DIR}/"
           
           echo "  Configuring git"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --list | grep user
           
           echo "  Adding files to git"
           git add "${COMMIT_DIR}"
+          git status --short
           
           echo "  Checking for changes"
           if git diff --staged --quiet; then
@@ -175,7 +188,7 @@ jobs:
             echo "  Committing changes"
             git commit -m "chore: update Terraform configuration for ${{ github.event.deployment.environment }} environment [skip ci]"
             
-            echo "  Pushing changes"
+            echo "  Pushing changes to remote"
             git push
           fi
       - name: Deploy my app
