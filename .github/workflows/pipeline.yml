@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TERRAFORM_VERSION: 1.6.6
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
-          VARIABLES_FILE_PATH: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service/my-azure-app-service.variables.tf
+          APPS_DIR: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service
         run: |
           echo "==> Installing Git"
           apk add --no-cache git
@@ -52,12 +52,25 @@ jobs:
           }
           EOF
           
+          echo "==> Scanning for Terraform app configurations"
+          VARS_FILES=$(find ${APPS_DIR} -maxdepth 1 -name "*.variables.tf" 2>/dev/null || true)
+          
+          if [ -z "$VARS_FILES" ]; then
+            echo "No Terraform apps found in ${APPS_DIR}, skipping infrastructure provisioning"
+            exit 0
+          fi
+          
+          echo "Found $(echo "$VARS_FILES" | wc -l) app configuration(s):"
+          for f in $VARS_FILES; do
+            echo "  - $(basename $f)"
+          done
+          
           echo "==> Creating working directory: ${TERRAFORM_WORK_DIR}"
           mkdir -p ${TERRAFORM_WORK_DIR}
           cd ${TERRAFORM_WORK_DIR}
           
-          echo "==> Generating main.tf with HCP Terraform configuration"
-          cat > main.tf << 'EOF'
+          echo "==> Generating main.tf header with HCP Terraform configuration"
+          cat > main.tf << 'TFEOF'
           terraform {
             cloud {
               organization = "mia-platform"
@@ -76,24 +89,54 @@ jobs:
           provider "azurerm" {
             features {}
           }
-
-          module "my-azure-app-service" {
-            source = "git::https://github.com/Mia-Platform-Experiments/tf-azure-app-service.git"
-            
-            service_name         = var.service_name
-            resource_group_name  = var.resource_group_name
-            location             = var.location
-            performance_profile  = var.performance_profile
-            tech_stack           = var.tech_stack
-          }
-          EOF
+          TFEOF
           
+          echo "==> Processing app configurations and generating module blocks"
+          for VARS_FILE in $VARS_FILES; do
+            BASENAME=$(basename "$VARS_FILE")
+            MODULE_NAME="${BASENAME%.variables.tf}"
+            
+            echo ""
+            echo "Processing app: $MODULE_NAME"
+            echo "  Source file: $VARS_FILE"
+            
+            # Extract variable names from the file
+            echo "  Extracting variable names..."
+            VAR_NAMES=$(grep -E '^\s*variable\s+"' "$VARS_FILE" | sed -E 's/.*variable\s+"([^"]+)".*/\1/')
+            VAR_COUNT=$(echo "$VAR_NAMES" | wc -w)
+            echo "  Found $VAR_COUNT variable(s): $(echo $VAR_NAMES | tr '\n' ' ')"
+            
+            # Generate module block
+            echo "  Generating module block..."
+            echo "" >> main.tf
+            echo "module \"${MODULE_NAME}\" {" >> main.tf
+            echo "  source = \"git::https://github.com/Mia-Platform-Experiments/tf-azure-app-service.git\"" >> main.tf
+            echo "" >> main.tf
+            
+            for VAR_NAME in $VAR_NAMES; do
+              echo "    Mapping: ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}"
+              echo "  ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}" >> main.tf
+            done
+            
+            echo "}" >> main.tf
+            
+            # Transform and copy variables file with prefixed names
+            echo "  Transforming variables file with prefix '${MODULE_NAME}_'..."
+            sed -E "s/variable \"([^\"]+)\"/variable \"${MODULE_NAME}_\1\"/" "$VARS_FILE" > "${TERRAFORM_WORK_DIR}/${BASENAME}"
+            echo "  Created: ${TERRAFORM_WORK_DIR}/${BASENAME}"
+          done
+          
+          echo ""
           echo "==> Generated main.tf content:"
           cat main.tf
           
-          echo "==> Copying variables file from: ${VARIABLES_FILE_PATH}"
-          cp ${VARIABLES_FILE_PATH} ${TERRAFORM_WORK_DIR}/
-          ls -la ${TERRAFORM_WORK_DIR}
+          echo ""
+          echo "==> Transformed variables files in working directory:"
+          ls -lah ${TERRAFORM_WORK_DIR}
+          
+          echo ""
+          echo "==> Sample of transformed variables (first file):"
+          head -20 ${TERRAFORM_WORK_DIR}/*.variables.tf | head -20
           
           echo "==> Initializing Terraform with HCP Terraform backend"
           terraform init
