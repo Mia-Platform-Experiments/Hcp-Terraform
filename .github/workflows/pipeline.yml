@@ -150,6 +150,7 @@ jobs:
           echo "==> Applying infrastructure changes"
           terraform apply -auto-approve
       - name: Deploy my app
+        if: ${{ false }} # TEMPORARY DISABLE KUBERNETES DEPLOYMENT STEP
         env:
           GIT_DEPTH: 1
           ENVIRONMENT_VARIABLES_PREFIX: MIA_
