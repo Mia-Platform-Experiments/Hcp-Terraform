@@ -122,7 +122,10 @@ jobs:
             
             # Transform and copy variables file with prefixed names
             echo "  Transforming variables file with prefix '${MODULE_NAME}_'..."
-            sed -E "s/variable \"([^\"]+)\"/variable \"${MODULE_NAME}_\1\"/" "$VARS_FILE" > "${TERRAFORM_WORK_DIR}/${BASENAME}"
+            sed -E \
+              -e "s/variable \"([^\"]+)\"/variable \"${MODULE_NAME}_\1\"/" \
+              -e "s/var\.([a-z_]+)/var.${MODULE_NAME}_\1/g" \
+              "$VARS_FILE" > "${TERRAFORM_WORK_DIR}/${BASENAME}"
             echo "  Created: ${TERRAFORM_WORK_DIR}/${BASENAME}"
           done
           
