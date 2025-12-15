@@ -30,5 +30,5 @@ variable "performance_profile" {
 variable "tech_stack" {
   description = "The runtime stack for the application."
   type        = string
-  default     = "Python 3.11"
+  default     = "Python 3.10"
 }
