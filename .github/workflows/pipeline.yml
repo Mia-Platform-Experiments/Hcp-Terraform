@@ -23,7 +23,7 @@ jobs:
         env:
           TF_API_TOKEN: ${{ secrets.TF_API_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TERRAFORM_VERSION: 1.6.6
+          TERRAFORM_VERSION: 1.14.2
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
           APPS_DIR: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service
         run: |
@@ -149,6 +149,35 @@ jobs:
           
           echo "==> Applying infrastructure changes"
           terraform apply -auto-approve
+          
+          echo ""
+          echo "==> Committing generated Terraform configuration"
+          COMMIT_DIR="${{ github.workspace }}/environments/${{ github.event.deployment.environment }}/terraform/app-service"
+          mkdir -p "${COMMIT_DIR}"
+          
+          echo "  Copying main.tf to ${COMMIT_DIR}"
+          cp ${TERRAFORM_WORK_DIR}/main.tf "${COMMIT_DIR}/main.tf"
+          
+          echo "  Copying transformed variables files to ${COMMIT_DIR}"
+          cp ${TERRAFORM_WORK_DIR}/*.variables.tf "${COMMIT_DIR}/"
+          
+          echo "  Configuring git"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "  Adding files to git"
+          git add "${COMMIT_DIR}"
+          
+          echo "  Checking for changes"
+          if git diff --staged --quiet; then
+            echo "  No changes to commit"
+          else
+            echo "  Committing changes"
+            git commit -m "chore: update Terraform configuration for ${{ github.event.deployment.environment }} environment [skip ci]"
+            
+            echo "  Pushing changes"
+            git push
+          fi
       - name: Deploy my app
         env:
           GIT_DEPTH: 1
