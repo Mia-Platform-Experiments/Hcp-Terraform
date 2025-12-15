@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tf-demo-python-hello-world
+  annotations:
+    mia-platform.eu/version: 14.4.1
+  labels:
+    app: tf-demo-python-hello-world
+    app.kubernetes.io/name: tf-demo-python-hello-world
+    app.kubernetes.io/version: latest
+    app.kubernetes.io/component: custom
+    app.kubernetes.io/part-of: hcp-terraform
+    app.kubernetes.io/managed-by: mia-platform
+    mia-platform.eu/stage: DEV
+    mia-platform.eu/tenant: b933f1ef-5b8e-4adf-a346-24a3b03d13e8
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+      nodePort: null
+  selector:
+    app: tf-demo-python-hello-world
