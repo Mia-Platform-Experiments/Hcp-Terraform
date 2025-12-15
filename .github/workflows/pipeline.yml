@@ -26,6 +26,9 @@ jobs:
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
           VARIABLES_FILE_PATH: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service/my-azure-app-service.variables.tf
         run: |
+          echo "==> Installing Git"
+          apk add --no-cache git
+          
           echo "==> Installing Terraform CLI ${TERRAFORM_VERSION}"
           wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
           unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
