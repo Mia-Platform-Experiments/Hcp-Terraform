@@ -1,7 +1,7 @@
 variable "service_name" {
   description = "The name of the service (e.g., payment-service). Used for resource naming."
   type        = string
-  default     = "mia-platform-tf-azure-demo-app"
+  default     = "my-node-app-service"
 }
 
 variable "resource_group_name" {
