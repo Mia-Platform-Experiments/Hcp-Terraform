@@ -145,10 +145,10 @@ jobs:
           terraform init
           
           echo "==> Planning infrastructure changes"
-          #terraform plan
+          terraform plan
           
           echo "==> Applying infrastructure changes"
-          #terraform apply -auto-approve
+          terraform apply -auto-approve
       - name: Deploy my app
         env:
           GIT_DEPTH: 1
