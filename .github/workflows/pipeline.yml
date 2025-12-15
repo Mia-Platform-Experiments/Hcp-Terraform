@@ -145,22 +145,24 @@ jobs:
           terraform init
           
           echo "==> Planning infrastructure changes"
-          terraform plan
+          #terraform plan
           
           echo "==> Applying infrastructure changes"
-          terraform apply -auto-approve
+          #terraform apply -auto-approve
           
           echo ""
           echo "==> Copying generated Terraform configuration for commit"
-          # Use GITHUB_WORKSPACE environment variable which maps to the mounted workspace volume
-          COMMIT_DIR="${GITHUB_WORKSPACE}/environments/${{ github.event.deployment.environment }}/terraform/app-service"
+          COMMIT_DIR="${{ github.workspace }}/environments/${{ github.event.deployment.environment }}/terraform/app-service"
           mkdir -p "${COMMIT_DIR}"
           cp ${TERRAFORM_WORK_DIR}/main.tf "${COMMIT_DIR}/main.tf"
           cp ${TERRAFORM_WORK_DIR}/*.variables.tf "${COMMIT_DIR}/"
           echo "  Files copied to ${COMMIT_DIR}"
           ls -la "${COMMIT_DIR}/"
       - name: Commit Terraform configuration
+        working-directory: ${{ github.workspace }}
         run: |
+          git config --global --add safe.directory ${{ github.workspace }}
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
