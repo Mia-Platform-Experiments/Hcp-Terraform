@@ -56,7 +56,7 @@ jobs:
           }
 
           module "my-azure-app-service" {
-            source = "git::https://github.com/Mia-Platform-Experiments/tf-azure-app-service"
+            source = "git::https://github.com/Mia-Platform-Experiments/tf-azure-app-service.git"
             
             service_name         = var.service_name
             resource_group_name  = var.resource_group_name
