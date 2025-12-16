@@ -173,6 +173,10 @@ jobs:
           echo "==> Generating deployment outputs for next step"
           terraform output -json > ${TERRAFORM_WORK_DIR}/deployments.json
           cat ${TERRAFORM_WORK_DIR}/deployments.json
+      - name: Install Azure CLI
+        run: |
+          apk add --no-cache python3 py3-pip
+          pip3 install azure-cli
       - name: Azure Login
         uses: azure/login@v2
         with:
