@@ -127,7 +127,7 @@ jobs:
             
             # Extract module source from transformed variables file
             echo "  Extracting module source..."
-            MODULE_SOURCE=$(terraform console < "${TERRAFORM_WORK_DIR}/${BASENAME}" <<< "var.${MODULE_NAME}__module_source" 2>/dev/null | tr -d '"') || {
+            MODULE_SOURCE=$(echo "var.${MODULE_NAME}__module_source" | terraform console "${TERRAFORM_WORK_DIR}/${BASENAME}" 2>/dev/null | tr -d '"') || {
               echo "ERROR: Failed to extract module source from $VARS_FILE"
               exit 1
             }
