@@ -7,7 +7,7 @@ jobs:
     concurrency: ${{ github.event.deployment.environment }}
     permissions:
       deployments: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     container: miaplatform/mlp:2.1.0
     steps:
@@ -204,6 +204,34 @@ jobs:
           echo "==> Generating deployment outputs for next step"
           terraform output -json > ${TERRAFORM_WORK_DIR}/deployments.json
           cat ${TERRAFORM_WORK_DIR}/deployments.json
+      - name: Commit generated Terraform files
+        if: success()
+        env:
+          TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+        run: |
+          echo "==> Creating target directory for generated Terraform files"
+          TARGET_DIR="${GITHUB_WORKSPACE}/environments/${ENVIRONMENT}/terraform"
+          mkdir -p "${TARGET_DIR}"
+          
+          echo "==> Copying generated files to ${TARGET_DIR}"
+          cp -v "${TERRAFORM_WORK_DIR}/main.tf" "${TARGET_DIR}/"
+          cp -v "${TERRAFORM_WORK_DIR}/"*.variables.tf "${TARGET_DIR}/" 2>/dev/null || echo "No variable files to copy"
+          cp -v "${TERRAFORM_WORK_DIR}/deployments.json" "${TARGET_DIR}/" 2>/dev/null || echo "No deployments.json to copy"
+          
+          echo "==> Configuring git"
+          cd "${GITHUB_WORKSPACE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          echo "==> Staging changes"
+          git add "environments/${ENVIRONMENT}/terraform/"
+          
+          echo "==> Committing changes"
+          git diff --staged --quiet || git commit -m "chore: update terraform config for ${ENVIRONMENT} environment"
+          
+          echo "==> Pushing changes"
+          git push
       - name: Install Azure CLI
         run: |
           apk add --no-cache python3 py3-pip gcc musl-dev python3-dev libffi-dev openssl-dev cargo make
