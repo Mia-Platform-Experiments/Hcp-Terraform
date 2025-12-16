@@ -1,10 +1,10 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Deploy Workflow
 on: deployment
 jobs:
-  deploy-ENVIRONMENT_NAME:
-    name: Deploy to ENVIRONMENT_NAME environment
-    if: ${{ github.event.deployment.environment }} == ENVIRONMENT_NAME
-    concurrency: ENVIRONMENT_NAME
+  deploy:
+    name: Deploy to ${{ github.event.deployment.environment }} environment
+    concurrency: ${{ github.event.deployment.environment }}
     permissions:
       deployments: write
       contents: read
