@@ -40,8 +40,7 @@ variable "container_names" {
   description = "List of blob container names to create (optional)."
   type        = list(string)
   default     = [
-  "default-container",
-  "container-2"
+  "default-container"
 ]
 }
 

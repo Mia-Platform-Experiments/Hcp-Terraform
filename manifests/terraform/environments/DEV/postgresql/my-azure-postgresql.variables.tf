@@ -5,7 +5,7 @@ variable "_module_source" {
 variable "service_name" {
   description = "The name of the service (e.g., payment-service). Used for resource naming. Note: PostgreSQL server names must be globally unique in Azure."
   type        = string
-  default     = "mia-azure-postgresql"
+  default     = "mia-azure-postgresql-demo"
 }
 
 variable "resource_group_name" {
@@ -40,7 +40,7 @@ variable "postgres_version" {
 variable "database_name" {
   description = "The name of the database to create."
   type        = string
-  default     = "mia-azure"
+  default     = "mia-azure-postgresql-demo"
 }
 
 variable "administrator_login" {
