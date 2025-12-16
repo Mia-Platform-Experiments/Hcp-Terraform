@@ -211,32 +211,20 @@ jobs:
           ENVIRONMENT: ${{ github.event.deployment.environment }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "==> Creating target directory for generated Terraform files"
-          TARGET_DIR="${GITHUB_WORKSPACE}/environments/${ENVIRONMENT}/terraform"
-          mkdir -p "${TARGET_DIR}"
+          echo "==> Setting up clean git repository for commit"
+          GIT_REPO_DIR="/tmp/repo-for-commit"
           
-          echo "==> Copying generated files to ${TARGET_DIR}"
+          git config --global --add safe.directory "${GIT_REPO_DIR}"
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${GIT_REPO_DIR}"
+          cd "${GIT_REPO_DIR}"
+          git checkout "${GITHUB_REF_NAME}"
+          
+          echo "==> Copying generated files to repository"
+          TARGET_DIR="${GIT_REPO_DIR}/environments/${ENVIRONMENT}/terraform"
+          mkdir -p "${TARGET_DIR}"
           cp -v "${TERRAFORM_WORK_DIR}/main.tf" "${TARGET_DIR}/"
           cp -v "${TERRAFORM_WORK_DIR}/"*.variables.tf "${TARGET_DIR}/" 2>/dev/null || echo "No variable files to copy"
           cp -v "${TERRAFORM_WORK_DIR}/deployments.json" "${TARGET_DIR}/" 2>/dev/null || echo "No deployments.json to copy"
-          
-          echo "==> Setting up git repository"
-          cd "${GITHUB_WORKSPACE}"
-          
-          # Configure safe directory first
-          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-          
-          # Initialize git if .git doesn't exist
-          if [ ! -d ".git" ]; then
-            echo "No .git directory found, initializing repository"
-            git init -b main
-            git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-            git fetch origin
-            # Add all existing files from checkout first, then reset to match remote
-            git add -A
-            git reset --hard "origin/${GITHUB_REF_NAME}"
-            git checkout -B "${GITHUB_REF_NAME}"
-          fi
           
           echo "==> Configuring git identity"
           git config user.name "github-actions[bot]"
@@ -249,7 +237,7 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: update terraform config for ${ENVIRONMENT} environment"
           
           echo "==> Pushing changes"
-          git push
+          git push origin "${GITHUB_REF_NAME}"
       - name: Install Azure CLI
         run: |
           apk add --no-cache python3 py3-pip gcc musl-dev python3-dev libffi-dev openssl-dev cargo make
