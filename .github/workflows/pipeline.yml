@@ -129,6 +129,21 @@ jobs:
             echo "  Created: ${TERRAFORM_WORK_DIR}/${BASENAME}"
           done
           
+          # Add outputs to main.tf for deployment mapping
+          cat >> main.tf << 'TFEOF'
+          
+          # Output deployment mapping for CD pipeline
+          output "deployments" {
+            description = "Deployment information for all apps"
+            value = {
+              for k, v in module : k => {
+                webapp_name      = v.webapp_name
+                deployed_service = v.deployed_service
+              }
+            }
+          }
+          TFEOF
+          
           echo ""
           echo "==> Generated main.tf content:"
           cat main.tf
@@ -149,6 +164,64 @@ jobs:
           
           echo "==> Applying infrastructure changes"
           terraform apply -auto-approve
+          
+          echo ""
+          echo "==> Generating deployment outputs for next step"
+          terraform output -json > ${TERRAFORM_WORK_DIR}/deployments.json
+          cat ${TERRAFORM_WORK_DIR}/deployments.json
+      - name: Deploy application code to Azure App Services
+        env:
+          TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
+          AZURE_STORAGE_ACCOUNT: ${{ secrets.AZURE_HCPTFDEMO_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_CONTAINER: ${{ secrets.AZURE_HCPTFDEMO_STORAGE_CONTAINER }}
+          RESOURCE_GROUP: terraform-demo
+        run: |
+          echo "==> Installing dependencies"
+          apk add --no-cache jq
+          
+          echo "==> Reading deployment configuration"
+          DEPLOYMENTS_FILE="${TERRAFORM_WORK_DIR}/deployments.json"
+          
+          if [ ! -f "$DEPLOYMENTS_FILE" ]; then
+            echo "No deployments.json found. Skipping code deployment."
+            exit 0
+          fi
+          
+          echo "==> Deployment configuration:"
+          cat "$DEPLOYMENTS_FILE"
+          
+          # Extract the deployments object
+          DEPLOYMENTS=$(jq -r '.deployments.value' "$DEPLOYMENTS_FILE")
+          
+          echo ""
+          echo "==> Deploying code to Azure App Services"
+          
+          # Loop through each app
+          for MODULE_NAME in $(echo "$DEPLOYMENTS" | jq -r 'keys[]'); do
+            WEBAPP_NAME=$(echo "$DEPLOYMENTS" | jq -r ".[\"$MODULE_NAME\"].webapp_name")
+            DEPLOYED_SERVICE=$(echo "$DEPLOYMENTS" | jq -r ".[\"$MODULE_NAME\"].deployed_service")
+            
+            echo ""
+            echo "Processing: $MODULE_NAME"
+            echo "  Web App: $WEBAPP_NAME"
+            echo "  Service: $DEPLOYED_SERVICE"
+            
+            # Construct blob URL
+            BLOB_URL="https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${AZURE_STORAGE_CONTAINER}/${DEPLOYED_SERVICE}/${DEPLOYED_SERVICE}-latest.zip"
+            echo "  Blob URL: $BLOB_URL"
+            
+            # Deploy using Azure CLI
+            echo "  Deploying ZIP package..."
+            az webapp deployment source config-zip \
+              --resource-group "$RESOURCE_GROUP" \
+              --name "$WEBAPP_NAME" \
+              --src "$BLOB_URL"
+            
+            echo "  ✓ Deployment completed for $WEBAPP_NAME"
+          done
+          
+          echo ""
+          echo "==> All deployments completed successfully"
       - name: Deploy my app
         if: ${{ false }} # TEMPORARY DISABLE KUBERNETES DEPLOYMENT STEP
         env:
