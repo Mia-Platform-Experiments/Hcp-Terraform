@@ -218,16 +218,23 @@ jobs:
             echo "  Web App: $WEBAPP_NAME"
             echo "  Service: $DEPLOYED_SERVICE"
             
-            # Construct blob URL
-            BLOB_URL="https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${AZURE_STORAGE_CONTAINER}/${DEPLOYED_SERVICE}/${DEPLOYED_SERVICE}-latest.zip"
-            echo "  Blob URL: $BLOB_URL"
+            # Download blob from storage
+            ZIP_FILE="${DEPLOYED_SERVICE}-latest.zip"
+            echo "  Downloading package from storage..."
+            az storage blob download \
+              --account-name "$AZURE_STORAGE_ACCOUNT" \
+              --container-name "$AZURE_STORAGE_CONTAINER" \
+              --name "${DEPLOYED_SERVICE}/${DEPLOYED_SERVICE}-latest.zip" \
+              --file "$ZIP_FILE" \
+              --auth-mode login
             
             # Deploy using Azure CLI
-            echo "  Deploying ZIP package..."
-            az webapp deployment source config-zip \
+            echo "  Deploying ZIP package to $WEBAPP_NAME..."
+            az webapp deploy \
               --resource-group "$RESOURCE_GROUP" \
               --name "$WEBAPP_NAME" \
-              --src "$BLOB_URL"
+              --src-path "$ZIP_FILE" \
+              --type zip
             
             echo "  ✓ Deployment completed for $WEBAPP_NAME"
           done
