@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TERRAFORM_VERSION: 1.14.2
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
-          APPS_DIR: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}/app-service
+          MODULES_BASE_DIR: ${{ github.workspace }}/manifests/terraform/environments/${{ github.event.deployment.environment }}
         run: |
           echo "==> Installing Git"
           apk add --no-cache git
@@ -52,14 +52,14 @@ jobs:
           }
           EOF
           
-          echo "==> Scanning for Terraform app configurations"
-          VARS_FILES=$(find ${APPS_DIR} -maxdepth 1 -name "*.variables.tf" 2>/dev/null || true)
+          echo "==> Scanning for Terraform module configurations"
+          VARS_FILES=$(find ${MODULES_BASE_DIR} -type f -name "*.variables.tf" 2>/dev/null || true)
           
           if [ -z "$VARS_FILES" ]; then
-            echo "No Terraform apps found in ${APPS_DIR}"
+            echo "No Terraform modules found in ${MODULES_BASE_DIR}"
             echo "Will proceed with empty configuration to allow resource cleanup"
           else
-            echo "Found $(echo "$VARS_FILES" | wc -l) app configuration(s):"
+            echo "Found $(echo "$VARS_FILES" | wc -l) module configuration(s):"
             for f in $VARS_FILES; do
               echo "  - $(basename $f)"
             done
@@ -91,34 +91,31 @@ jobs:
           }
           TFEOF
           
-          echo "==> Processing app configurations and generating module blocks"
+          echo "==> Processing module configurations and generating module blocks"
+          # Track app-service modules for deployment output
+          APP_SERVICE_MODULES=""
+          
           for VARS_FILE in $VARS_FILES; do
             BASENAME=$(basename "$VARS_FILE")
             MODULE_NAME="${BASENAME%.variables.tf}"
             
             echo ""
-            echo "Processing app: $MODULE_NAME"
+            echo "Processing module: $MODULE_NAME"
             echo "  Source file: $VARS_FILE"
             
-            # Extract variable names from the file
+            # Check if this is an app-service module based on folder path
+            if echo "$VARS_FILE" | grep -q '/app-service/'; then
+              echo "  Type: app-service (will be included in deployments)"
+              APP_SERVICE_MODULES="$APP_SERVICE_MODULES $MODULE_NAME"
+            else
+              echo "  Type: infrastructure-only (no code deployment)"
+            fi
+            
+            # Extract variable names from the file (exclude _module_source)
             echo "  Extracting variable names..."
-            VAR_NAMES=$(grep -E '^\s*variable\s+"' "$VARS_FILE" | sed -E 's/.*variable\s+"([^"]+)".*/\1/')
+            VAR_NAMES=$(grep -E '^\s*variable\s+"' "$VARS_FILE" | sed -E 's/.*variable\s+"([^"]+)".*/\1/' | grep -v '^_module_source$')
             VAR_COUNT=$(echo "$VAR_NAMES" | wc -w)
             echo "  Found $VAR_COUNT variable(s): $(echo $VAR_NAMES | tr '\n' ' ')"
-            
-            # Generate module block
-            echo "  Generating module block..."
-            echo "" >> main.tf
-            echo "module \"${MODULE_NAME}\" {" >> main.tf
-            echo "  source = \"git::https://github.com/Mia-Platform-Experiments/tf-azure-app-service.git\"" >> main.tf
-            echo "" >> main.tf
-            
-            for VAR_NAME in $VAR_NAMES; do
-              echo "    Mapping: ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}"
-              echo "  ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}" >> main.tf
-            done
-            
-            echo "}" >> main.tf
             
             # Transform and copy variables file with prefixed names
             echo "  Transforming variables file with prefix '${MODULE_NAME}_'..."
@@ -127,23 +124,50 @@ jobs:
               -e "s/var\.([a-z_]+)/var.${MODULE_NAME}_\1/g" \
               "$VARS_FILE" > "${TERRAFORM_WORK_DIR}/${BASENAME}"
             echo "  Created: ${TERRAFORM_WORK_DIR}/${BASENAME}"
+            
+            # Extract module source from transformed variables file
+            echo "  Extracting module source..."
+            MODULE_SOURCE=$(terraform console < "${TERRAFORM_WORK_DIR}/${BASENAME}" <<< "var.${MODULE_NAME}__module_source" 2>/dev/null | tr -d '"') || {
+              echo "ERROR: Failed to extract module source from $VARS_FILE"
+              exit 1
+            }
+            echo "  Module source: ${MODULE_SOURCE}"
+            
+            # Generate module block
+            echo "  Generating module block..."
+            echo "" >> main.tf
+            echo "module \"${MODULE_NAME}\" {" >> main.tf
+            echo "  source = \"${MODULE_SOURCE}\"" >> main.tf
+            echo "" >> main.tf
+            
+            for VAR_NAME in $VAR_NAMES; do
+              echo "    Mapping: ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}"
+              echo "  ${VAR_NAME} = var.${MODULE_NAME}_${VAR_NAME}" >> main.tf
+            done
+            
+            echo "}" >> main.tf
           done
           
-          # Add outputs to main.tf for deployment mapping
+          # Generate deployment output for app-service modules only
+          echo ""
+          echo "==> Generating deployment output for app-service modules"
           echo "" >> main.tf
           echo "# Output deployment mapping for CD pipeline" >> main.tf
           echo "output \"deployments\" {" >> main.tf
-          echo "  description = \"Deployment information for all apps\"" >> main.tf
+          echo "  description = \"Deployment information for app-service modules\"" >> main.tf
           echo "  value = {" >> main.tf
           
-          for VARS_FILE in $VARS_FILES; do
-            BASENAME=$(basename "$VARS_FILE")
-            MODULE_NAME="${BASENAME%.variables.tf}"
-            echo "    ${MODULE_NAME} = {" >> main.tf
-            echo "      webapp_name      = module.${MODULE_NAME}.webapp_name" >> main.tf
-            echo "      deployed_service = module.${MODULE_NAME}.deployed_service" >> main.tf
-            echo "    }" >> main.tf
-          done
+          if [ -n "$APP_SERVICE_MODULES" ]; then
+            for MODULE_NAME in $APP_SERVICE_MODULES; do
+              echo "  Including ${MODULE_NAME} in deployments"
+              echo "    ${MODULE_NAME} = {" >> main.tf
+              echo "      webapp_name      = module.${MODULE_NAME}.webapp_name" >> main.tf
+              echo "      deployed_service = module.${MODULE_NAME}.deployed_service" >> main.tf
+              echo "    }" >> main.tf
+            done
+          else
+            echo "  No app-service modules found"
+          fi
           
           echo "  }" >> main.tf
           echo "}" >> main.tf
@@ -153,20 +177,11 @@ jobs:
           cat main.tf
           
           echo ""
-          echo "==> Transformed variables files in working directory:"
-          ls -lah ${TERRAFORM_WORK_DIR}
-          
-          echo ""
-          echo "==> Sample of transformed variables (first file):"
-          head -20 ${TERRAFORM_WORK_DIR}/*.variables.tf | head -20
-          
           echo "==> Initializing Terraform with HCP Terraform backend"
           terraform init
           
-          echo "==> Planning infrastructure changes"
-          terraform plan
-          
-          echo "==> Applying infrastructure changes"
+          echo ""
+          echo "==> Applying infrastructure changes (plan runs automatically in HCP Terraform)"
           terraform apply -auto-approve
           
           echo ""
@@ -205,6 +220,12 @@ jobs:
           # Extract the deployments object
           DEPLOYMENTS=$(jq -r '.deployments.value' "$DEPLOYMENTS_FILE")
           
+          # Check if there are any app services to deploy
+          if [ -z "$DEPLOYMENTS" ] || [ "$DEPLOYMENTS" = "{}" ] || [ "$DEPLOYMENTS" = "null" ]; then
+            echo "No app-service modules found. Skipping Azure code deployment."
+            exit 0
+          fi
+          
           echo ""
           echo "==> Deploying code to Azure App Services"
           
@@ -234,7 +255,8 @@ jobs:
               --resource-group "$RESOURCE_GROUP" \
               --name "$WEBAPP_NAME" \
               --src-path "$ZIP_FILE" \
-              --type zip
+              --type zip \
+              --track-status false
             
             echo "  ✓ Deployment completed for $WEBAPP_NAME"
           done
