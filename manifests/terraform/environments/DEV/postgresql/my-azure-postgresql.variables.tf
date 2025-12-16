@@ -17,7 +17,7 @@ variable "resource_group_name" {
 variable "location" {
   description = "The Azure region to deploy to."
   type        = string
-  default     = "West Europe"
+  default     = "North Europe"
 }
 
 variable "performance_profile" {

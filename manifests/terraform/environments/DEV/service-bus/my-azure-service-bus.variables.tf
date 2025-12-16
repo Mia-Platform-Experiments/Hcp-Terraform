@@ -17,7 +17,7 @@ variable "resource_group_name" {
 variable "location" {
   description = "The Azure region to deploy to."
   type        = string
-  default     = "West Europe"
+  default     = "North Europe"
 }
 
 variable "performance_profile" {
@@ -36,14 +36,5 @@ variable "queue_names" {
   type        = list(string)
   default     = [
   "default-queue"
-]
-}
-
-variable "topic_names" {
-  description = "List of Service Bus topic names to create."
-  type        = list(string)
-  default     = [
-  "default-topic",
-  "default-topic-2"
 ]
 }
