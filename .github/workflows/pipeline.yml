@@ -223,17 +223,17 @@ jobs:
           echo "==> Setting up git repository"
           cd "${GITHUB_WORKSPACE}"
           
+          # Configure safe directory first
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          
           # Initialize git if .git doesn't exist
           if [ ! -d ".git" ]; then
             echo "No .git directory found, initializing repository"
-            git init
+            git init -b main
             git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             git fetch origin
             git checkout -B "${GITHUB_REF_NAME}" "origin/${GITHUB_REF_NAME}"
           fi
-          
-          echo "==> Configuring git safe directory"
-          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           
           echo "==> Configuring git identity"
           git config user.name "github-actions[bot]"
