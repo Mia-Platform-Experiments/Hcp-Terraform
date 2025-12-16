@@ -173,6 +173,10 @@ jobs:
           echo "==> Generating deployment outputs for next step"
           terraform output -json > ${TERRAFORM_WORK_DIR}/deployments.json
           cat ${TERRAFORM_WORK_DIR}/deployments.json
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_HCPTFDEMO_CREDENTIALS }}
       - name: Deploy application code to Azure App Services
         env:
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
