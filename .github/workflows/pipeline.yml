@@ -56,14 +56,14 @@ jobs:
           VARS_FILES=$(find ${APPS_DIR} -maxdepth 1 -name "*.variables.tf" 2>/dev/null || true)
           
           if [ -z "$VARS_FILES" ]; then
-            echo "No Terraform apps found in ${APPS_DIR}, skipping infrastructure provisioning"
-            exit 0
+            echo "No Terraform apps found in ${APPS_DIR}"
+            echo "Will proceed with empty configuration to allow resource cleanup"
+          else
+            echo "Found $(echo "$VARS_FILES" | wc -l) app configuration(s):"
+            for f in $VARS_FILES; do
+              echo "  - $(basename $f)"
+            done
           fi
-          
-          echo "Found $(echo "$VARS_FILES" | wc -l) app configuration(s):"
-          for f in $VARS_FILES; do
-            echo "  - $(basename $f)"
-          done
           
           echo "==> Creating working directory: ${TERRAFORM_WORK_DIR}"
           mkdir -p ${TERRAFORM_WORK_DIR}
