@@ -232,7 +232,10 @@ jobs:
             git init -b main
             git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
             git fetch origin
-            git checkout -B "${GITHUB_REF_NAME}" "origin/${GITHUB_REF_NAME}"
+            # Add all existing files from checkout first, then reset to match remote
+            git add -A
+            git reset --hard "origin/${GITHUB_REF_NAME}"
+            git checkout -B "${GITHUB_REF_NAME}"
           fi
           
           echo "==> Configuring git identity"
