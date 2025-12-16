@@ -1,13 +1,13 @@
 variable "service_name" {
   description = "The name of the service (e.g., payment-service). Used for resource naming."
   type        = string
-  default     = "mia-node-azure-app-service"
+  default     = "mia-python-azure-app-service"
 }
 
 variable "deployed_service" {
   description = "Service to be deployed (e.g., 'service-hello-world')"
   type        = string
-  default     = "tf-demo-node-hello-world"
+  default     = "tf-demo-python-hello-world"
 }
 
 variable "resource_group_name" {
@@ -36,5 +36,5 @@ variable "performance_profile" {
 variable "tech_stack" {
   description = "The runtime stack for the application."
   type        = string
-  default     = "Node.js 18 LTS"
+  default     = "Python 3.10"
 }

@@ -1,13 +1,7 @@
 variable "service_name" {
-  description = "The name of the service (e.g., payment-service). Used for resource naming."
+  description = "The name of the service (e.g., payment-service). Used for resource naming. Note: Service Bus namespace names must be globally unique in Azure."
   type        = string
-  default     = "mia-node-azure-app-service"
-}
-
-variable "deployed_service" {
-  description = "Service to be deployed (e.g., 'service-hello-world')"
-  type        = string
-  default     = "tf-demo-node-hello-world"
+  default     = "mia-azure-service-bus"
 }
 
 variable "resource_group_name" {
@@ -33,8 +27,19 @@ variable "performance_profile" {
   }
 }
 
-variable "tech_stack" {
-  description = "The runtime stack for the application."
-  type        = string
-  default     = "Node.js 18 LTS"
+variable "queue_names" {
+  description = "List of Service Bus queue names to create."
+  type        = list(string)
+  default     = [
+  "default-queue"
+]
+}
+
+variable "topic_names" {
+  description = "List of Service Bus topic names to create."
+  type        = list(string)
+  default     = [
+  "default-topic",
+  "default-topic-2"
+]
 }
