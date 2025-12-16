@@ -209,6 +209,7 @@ jobs:
         env:
           TERRAFORM_WORK_DIR: ${{ github.workspace }}/terraform-work
           ENVIRONMENT: ${{ github.event.deployment.environment }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "==> Creating target directory for generated Terraform files"
           TARGET_DIR="${GITHUB_WORKSPACE}/environments/${ENVIRONMENT}/terraform"
@@ -219,19 +220,22 @@ jobs:
           cp -v "${TERRAFORM_WORK_DIR}/"*.variables.tf "${TARGET_DIR}/" 2>/dev/null || echo "No variable files to copy"
           cp -v "${TERRAFORM_WORK_DIR}/deployments.json" "${TARGET_DIR}/" 2>/dev/null || echo "No deployments.json to copy"
           
-          echo "==> Debug: Checking workspace structure"
-          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}"
-          ls -la "${GITHUB_WORKSPACE}" || echo "Cannot list workspace"
-          echo ""
-          echo "Checking for .git directory:"
-          ls -la "${GITHUB_WORKSPACE}/.git" || echo "No .git directory found"
-          echo ""
+          echo "==> Setting up git repository"
+          cd "${GITHUB_WORKSPACE}"
+          
+          # Initialize git if .git doesn't exist
+          if [ ! -d ".git" ]; then
+            echo "No .git directory found, initializing repository"
+            git init
+            git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            git fetch origin
+            git checkout -B "${GITHUB_REF_NAME}" "origin/${GITHUB_REF_NAME}"
+          fi
           
           echo "==> Configuring git safe directory"
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           
-          echo "==> Configuring git"
-          cd "${GITHUB_WORKSPACE}"
+          echo "==> Configuring git identity"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
