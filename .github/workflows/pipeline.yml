@@ -219,6 +219,17 @@ jobs:
           cp -v "${TERRAFORM_WORK_DIR}/"*.variables.tf "${TARGET_DIR}/" 2>/dev/null || echo "No variable files to copy"
           cp -v "${TERRAFORM_WORK_DIR}/deployments.json" "${TARGET_DIR}/" 2>/dev/null || echo "No deployments.json to copy"
           
+          echo "==> Debug: Checking workspace structure"
+          echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE}"
+          ls -la "${GITHUB_WORKSPACE}" || echo "Cannot list workspace"
+          echo ""
+          echo "Checking for .git directory:"
+          ls -la "${GITHUB_WORKSPACE}/.git" || echo "No .git directory found"
+          echo ""
+          
+          echo "==> Configuring git safe directory"
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          
           echo "==> Configuring git"
           cd "${GITHUB_WORKSPACE}"
           git config user.name "github-actions[bot]"
