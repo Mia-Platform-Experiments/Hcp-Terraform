@@ -1,0 +1,34 @@
+{
+  "deployments": {
+    "sensitive": false,
+    "type": [
+      "object",
+      {
+        "node-azure-app-service": [
+          "object",
+          {
+            "deployed_service": "string",
+            "webapp_name": "string"
+          }
+        ],
+        "python-azure-app-service": [
+          "object",
+          {
+            "deployed_service": "string",
+            "webapp_name": "string"
+          }
+        ]
+      }
+    ],
+    "value": {
+      "node-azure-app-service": {
+        "deployed_service": "tf-demo-node-hello-world",
+        "webapp_name": "app-mia-node-azure-app-service"
+      },
+      "python-azure-app-service": {
+        "deployed_service": "tf-demo-python-hello-world",
+        "webapp_name": "app-mia-python-azure-app-service"
+      }
+    }
+  }
+}
