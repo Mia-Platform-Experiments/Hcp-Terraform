@@ -130,19 +130,23 @@ jobs:
           done
           
           # Add outputs to main.tf for deployment mapping
-          cat >> main.tf << 'TFEOF'
+          echo "" >> main.tf
+          echo "# Output deployment mapping for CD pipeline" >> main.tf
+          echo "output \"deployments\" {" >> main.tf
+          echo "  description = \"Deployment information for all apps\"" >> main.tf
+          echo "  value = {" >> main.tf
           
-          # Output deployment mapping for CD pipeline
-          output "deployments" {
-            description = "Deployment information for all apps"
-            value = {
-              for k, v in module : k => {
-                webapp_name      = v.webapp_name
-                deployed_service = v.deployed_service
-              }
-            }
-          }
-          TFEOF
+          for VARS_FILE in $VARS_FILES; do
+            BASENAME=$(basename "$VARS_FILE")
+            MODULE_NAME="${BASENAME%.variables.tf}"
+            echo "    ${MODULE_NAME} = {" >> main.tf
+            echo "      webapp_name      = module.${MODULE_NAME}.webapp_name" >> main.tf
+            echo "      deployed_service = module.${MODULE_NAME}.deployed_service" >> main.tf
+            echo "    }" >> main.tf
+          done
+          
+          echo "  }" >> main.tf
+          echo "}" >> main.tf
           
           echo ""
           echo "==> Generated main.tf content:"
