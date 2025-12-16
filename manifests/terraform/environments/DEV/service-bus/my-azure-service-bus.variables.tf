@@ -1,3 +1,7 @@
+variable "_module_source" {
+  default = "git::https://github.com/Mia-Platform-Experiments/tf-azure-servicebus.git"
+}
+
 variable "service_name" {
   description = "The name of the service (e.g., payment-service). Used for resource naming. Note: Service Bus namespace names must be globally unique in Azure."
   type        = string

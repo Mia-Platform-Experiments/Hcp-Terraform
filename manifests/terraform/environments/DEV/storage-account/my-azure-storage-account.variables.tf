@@ -1,3 +1,7 @@
+variable "_module_source" {
+  default = "git::https://github.com/Mia-Platform-Experiments/tf-azure-storage.git"
+}
+
 variable "service_name" {
   description = "The name of the service (e.g., paymentservice). Used for storage account naming. Must be 3-24 lowercase alphanumeric characters. Note: Storage account names must be globally unique in Azure."
   type        = string
