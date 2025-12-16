@@ -127,10 +127,26 @@ jobs:
             
             # Extract module source from transformed variables file
             echo "  Extracting module source..."
-            MODULE_SOURCE=$(echo "var.${MODULE_NAME}__module_source" | terraform console "${TERRAFORM_WORK_DIR}/${BASENAME}" 2>/dev/null | tr -d '"') || {
+            # Create a temporary directory with minimal terraform config to use console
+            CONSOLE_DIR=$(mktemp -d)
+            echo "  Debug: Created temp dir ${CONSOLE_DIR}"
+            cp "${TERRAFORM_WORK_DIR}/${BASENAME}" "${CONSOLE_DIR}/variables.tf"
+            echo "  Debug: Copied variables to ${CONSOLE_DIR}/variables.tf"
+            echo "  Debug: Running terraform console with var.${MODULE_NAME}__module_source"
+            cd "${CONSOLE_DIR}"
+            MODULE_SOURCE=$(echo "var.${MODULE_NAME}__module_source" | terraform console 2>&1 | tee /dev/stderr | tail -1 | tr -d '"')
+            CONSOLE_EXIT=$?
+            cd - > /dev/null
+            echo "  Debug: terraform console exit code: ${CONSOLE_EXIT}"
+            echo "  Debug: Extracted value: '${MODULE_SOURCE}'"
+            rm -rf "${CONSOLE_DIR}"
+            
+            if [ -z "$MODULE_SOURCE" ] || [ "$CONSOLE_EXIT" -ne 0 ]; then
               echo "ERROR: Failed to extract module source from $VARS_FILE"
+              echo "Debug: Content of variables file:"
+              head -20 "${TERRAFORM_WORK_DIR}/${BASENAME}"
               exit 1
-            }
+            fi
             echo "  Module source: ${MODULE_SOURCE}"
             
             # Generate module block
